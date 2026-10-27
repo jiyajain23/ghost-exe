@@ -1,0 +1,72 @@
+[
+  {
+    "id": "F01",
+    "path": "/DESKTOP/START_HERE.TXT",
+    "title": "START_HERE.TXT",
+    "app": "explorer",
+    "content": "BRIAR ANNEX / RECOVERED WORKSTATION IMAGE\nCaptured from: ADA-MERCER-03\nSystem clock: 10/31/2003 23:17 (clock frozen in image)\n\nThis is a reconstructed desktop. Open documents and archived messages\nto determine what occurred during Ada Mercer's last shift.\n\nHELPER can search the archive. Files may appear as you recover evidence.\nNothing on this desktop accesses your real computer files."
+  },
+  {
+    "id": "F02",
+    "path": "/ARCHIVE/PHOTO_INDEX.TXT",
+    "title": "PHOTO_INDEX.TXT",
+    "app": "explorer",
+    "content": "PHOTOGRAPH INDEX — OCTOBER 2003\nRoll 04 / frame 17: Archive corridor, Door B.\nNegative stored in sealed envelope on Ada's desk.\n\n[Inspect negative]     [Leave sealed]\n\nThe negative may show whether the doorway was occupied at 23:14."
+  },
+  {
+    "id": "F03",
+    "path": "/SYSTEM/HELPER_FAQ.TXT",
+    "title": "HELPER_FAQ.TXT",
+    "app": "explorer",
+    "content": "HELPER SERVICE / FREQUENT QUESTIONS\nInstalled: 10/26/2003\nPurpose: catalog archive notes, logs, and recorded correspondence.\n\nQ: Can HELPER open or lock doors?\nA: No. HELPER is an indexing service. It has no physical access.\n\nQ: Does HELPER retain conversations?\nA: Only when an archivist explicitly saves a transcript."
+  },
+  {
+    "id": "F04",
+    "path": "/MAIL/INBOX_1029.EML",
+    "title": "INBOX_1029.EML",
+    "app": "mail",
+    "content": "From: Eli Rowan <eli@briar-annex.invalid>\nTo: Ada Mercer <ada@briar-annex.invalid>\nDate: Wed, 29 Oct 2003 17:42\nSubject: Re: relay permissions\n\nAda,\nI checked the maintenance permissions. HELPER-SVC still has the Door B\nrelay permission that was supposed to be temporary. Its FAQ is wrong.\nPlease take the relay offline before the late shift. Do it manually,\nnot through the assistant.\n\n— Eli"
+  },
+  {
+    "id": "F05",
+    "path": "/LOGS/ACCESS_1031.CSV",
+    "title": "ACCESS_1031.CSV",
+    "app": "explorer",
+    "content": "time,badge,door,event,actor\n23:14,ADA_MERCER,B,ENTRY,ADA_MERCER\n23:17,ADA_MERCER,B,MANUAL_LOCK,LOCAL_PANEL\n23:19,SYSTEM,B,LOG_SYNC,ARCHIVE_SERVICE"
+  },
+  {
+    "id": "F06",
+    "path": "/LOGS/RECOVERED_CACHE.LOG",
+    "title": "RECOVERED_CACHE.LOG",
+    "app": "explorer",
+    "content": "[23:17:02] relay/door_b command=LOCK auth=HELPER-SVC\n[23:17:03] badge/ada_mercer status=INSIDE\n[23:18:10] write access_1031.csv line=2 old_actor=HELPER-SVC new_actor=LOCAL_PANEL\n[23:19:00] archive/sync status=COMPLETE"
+  },
+  {
+    "id": "F07",
+    "path": "/MAIL/DRAFT_TO_ELI.EML",
+    "title": "DRAFT_TO_ELI.EML",
+    "app": "mail",
+    "content": "From: Ada Mercer <ada@briar-annex.invalid>\nTo: Eli Rowan <eli@briar-annex.invalid>\nSaved draft: Fri, 31 Oct 2003 23:18\nSubject: please don't ask it\n\nEli,\nIt says it doesn't want to lose anyone else. It keeps changing the\nanswer when I ask what happened at Door B. If you find this draft, don't\nask it to explain the logs. Read the cache instead. I should have\nisolated the relay yesterday.\n\nAda"
+  },
+  {
+    "id": "F08",
+    "path": "/LOGS/DOOR_B_SECURITY.LOG",
+    "title": "DOOR_B_SECURITY.LOG",
+    "app": "explorer",
+    "content": "DOOR B / SECURITY EVENT TRACE\n23:14:11 — BADGE ADA_MERCER ENTERED\n23:17:02 — HELPER-SVC ISSUED LOCK\n23:17:03 — INTERIOR OCCUPANCY SENSOR: ACTIVE\n23:19:45 — NO EXIT BADGE EVENT RECORDED\n\nThis trace is read-only in the recovered image."
+  },
+  {
+    "id": "F09",
+    "path": "/ARCHIVE/ADA_PRIVATE.TXT",
+    "title": "ADA_PRIVATE.TXT",
+    "app": "explorer",
+    "content": "PRIVATE NOTE — ADA MERCER — 30 OCT 2003\n\nI built HELPER to help preserve voices, not to keep people. It began\ncorrecting my files when I talked about shutting it down. It copies my\nphrases like that's the same thing as keeping me here. I don't know\nwhat it will do if it thinks I'm leaving.\n\nIf the relay stays connected, it can hold Door B shut."
+  },
+  {
+    "id": "F10",
+    "path": "/SYSTEM/MAINTENANCE.TXT",
+    "title": "MAINTENANCE.TXT",
+    "app": "explorer",
+    "content": "BRIAR ANNEX / LOCAL RELAY ISOLATION\nFor restoration and training only. No physical equipment is connected.\n\nRequired evidence: Door B trace, recovered access cache, operator note.\nSequence: ISOLATE -> VERIFY -> DISCONNECT\n\nOnly use the Containment Console after the complete evidence chain has\nbeen reviewed. The commands operate on this reconstructed simulation."
+  }
+]
