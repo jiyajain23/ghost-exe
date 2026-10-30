@@ -132,4 +132,5 @@ class Repository:
     def clear_history(db):
         db.execute('DELETE FROM events')
         db.execute('DELETE FROM ghost_beliefs')
+        db.execute('UPDATE runs SET parent_run_id = NULL')
         db.execute('DELETE FROM runs')

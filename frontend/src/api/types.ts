@@ -14,6 +14,7 @@ export interface DirectorEffect {
 }
 
 export interface RunState {
+  ending_presentation: { title: string; final_line: string; narrative: string } | null;
   run_id: string;
   run_index: number;
   status: 'active' | 'completed' | 'abandoned';

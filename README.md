@@ -3,7 +3,7 @@
 A local-first psychological horror investigation on a fictional recovered 2003
 VesperOS desktop. The Python Director owns evidence, clue gates, saves, and the
 single ending. Phase 3 adds optional local Gemma 3 dialogue through Ollama.
-Cross-run memory and generated D01 notes remain Phase 4 work.
+Phase 4 implements cross-run memory and generated D01 notes from saved in-game events.
 
 ## Windows PowerShell
 
@@ -79,26 +79,67 @@ and prints timings, fallback counts, and mock/Gemma comparisons. Use the venv
 Python instead if dependencies were installed there. On this laptop, the installed
 system Python had dependencies; no `.venv` existed during verification.
 
-October 30, 2026 verification:
+## Current verification and limitations
 
-- Existing baseline: 76 tests passed before changes.
-- Final backend suite: **94 passed**, with one existing Starlette/httpx deprecation warning.
-- Backend tests cover HTTP/schema failures, redirects, response bounds, injection
-  role separation, unsupported story details, timeouts, progression after failure,
-  and browsing during pending inference. See `backend/tests/test_phase3.py`.
-- Frontend TypeScript and production build passed.
-- Installed `gemma3:1b` (806 MB) handled five live prompts: mean 5.18 seconds;
-  one accepted generated greeting and four safe fallbacks after filtering.
-  Example: Gemma said "Greetings."; mock introduced itself as the indexing service.
-- The initial live check invented a project named Chronos. The strengthened filter
-  rejects that response; it is retained as a regression case. These few samples
-  do not establish universal model correctness or latency.
-- Manual browser verification was blocked: Computer Use was not approved to launch
-  Brave. Chat rendering, full UI playthrough, and Wi-Fi-off video remain unverified.
-- The supplied frontend still lacks containment API wiring and document-list
-  refresh on clue unlocks; those pre-existing Phase 2 gaps mean full UI completion
-  must not be claimed from the passing Director playthrough tests.
+October 30, 2026: 103 backend tests and 3 frontend ending-render tests pass.
+The frontend build includes TypeScript checking and passes. Tests repeat the full
+ending/memory scenario three times on one save, cover both photo choices, duplicate
+reads/choices, completed-run restoration, and simulated chat outage/recovery.
 
-No external inference is configured. Actual disconnected-network operation has
-not been demonstrated. Phase 3 acceptance remains pending the browser/offline
-checks. No Phase 4 memory implementation, commit, push, or PR was performed.
+Actual Gemma 3 1B inference was verified in Phase 3. A five-question C1 sample
+averaged 5.84 seconds: one generated reply passed and four used safety fallbacks.
+This small sample does not guarantee latency or model correctness. Browser
+click-through and physical internet-disconnection proof remain unverified.
+Containment UI, document refresh, and the dedicated ending screen are implemented.
+
+No DB files, environment files, model binaries, caches, or build output were found
+in tracked files during this pass. A fresh-clone dependency installation was not
+repeated; the build used existing local dependencies. No accounts or secret keys
+are required. Do not treat local-only configuration as demonstrated offline proof.
+
+## Hardware and troubleshooting
+
+The installed Gemma 3 1B weights occupied approximately 806 MB. Allow additional
+space for Ollama, Python/Node dependencies, and runtime caches; inference also uses
+RAM beyond the weight size. No minimum RAM or speed guarantee has been measured.
+Larger Gemma profiles are optional and unverified. Mock mode requires no model.
+
+- Backend unavailable: start the backend on 127.0.0.1:8000, then retry connection.
+- Port 5173 occupied: stop your other dev server; Vite intentionally uses a fixed port.
+- HELPER interrupted: check `ollama list` and backend mode; safe scripted replies let
+  you continue. Restart the backend after changing environment settings.
+- Stale save after history clear: refresh, then explicitly start a new investigation.
+- PowerShell blocks npm.ps1: use `npm.cmd`; venv activation is not required.
+- On small screens app windows fill the available area; use taskbar buttons to switch.
+
+See [DEMO.md](DEMO.md) for the 60–90 second recording script and remaining manual checks.
+
+## Phase 4: persistent investigation memory
+
+Restart Investigation now creates a new saved run and abandons an active prior run.
+Refresh resumes the same run. On the first chat of a new run with meaningful prior
+history, the Director references the saved photo choice (preferred), file read, or
+question category and reveals SYSTEM/HELPER_NOTES.TXT. Notes are generated from a
+bounded event projection stored at run creation; inference cannot invent the reveal.
+No raw player chat is stored. Both photo branches are supported.
+
+To clear app-owned history explicitly (this removes all saved investigations), run:
+
+```powershell
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/api/history/clear -ContentType 'application/json' -Body '{"confirm":true}'
+```
+
+Then refresh and start a new investigation when the stale-save message appears.
+Only the app database is cleared; canonical files and model weights are untouched.
+Phase 4 tests cover both photo choices, hidden notes before reveal, DB-backed notes,
+server recreation, no history, alternate sources and clearing linked runs. Browser
+verification remains pending because browser automation access was not approved.
+
+
+Phase 4 verification: `python -m pytest backend/tests -q` passed 101 tests;
+`npm.cmd --prefix frontend run build` passed TypeScript and production bundling;
+`node --test frontend/tests/ending.cjs` passed all 3 ending tests.
+`python backend/verify_phase4.py` passed the real HTTP demo in both mock and
+Ollama-configured modes using temporary saves. Memory replies bypass inference in
+both modes; this does not measure Gemma performance. Full browser click-through
+and disconnected-network proof remain unverified. Phase 5 regression and documentation work is complete; browser/offline acceptance checks remain pending.

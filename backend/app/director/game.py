@@ -25,6 +25,7 @@ from app.api.schemas import (
     StartRunResponse,
 )
 from app.content.manifest import MANIFEST
+from app.director.memory import project, notes
 from app.ghost.adapter import (
     GhostAdapter,
     GhostContext,
@@ -136,8 +137,11 @@ class Director:
         # Ending state
         ending = 'DO_NOT_FORGET' if containment_index >= 3 or run['status'] == 'completed' else None
 
-        has_prior = self.repository.has_qualified_prior_run(db, run_id)
+        dossier = self.repository.get_beliefs(db, run_id).get('prior_dossier')
+        has_prior = dossier is not None
         mem_revealed = any(e['type'] == 'memory_revealed' for e in events)
+        if mem_revealed and dossier:
+            visible.append('D01')
 
         return RunState(
             run_id=run_id,
@@ -153,6 +157,11 @@ class Director:
             helper_chat_turns=chat_turns,
             memory_revealed=mem_revealed,
             has_qualified_prior_run=has_prior,
+            ending_presentation={
+                'title': 'DO NOT FORGET',
+                'final_line': 'If you close the archive, who will remember she was here?',
+                'narrative': ENDING_FINAL_MESSAGE,
+            } if run['status'] == 'completed' else None,
             ending=ending,
         )
 
@@ -176,18 +185,32 @@ class Director:
             raise GameError(409, 'This investigation is no longer active.')
 
     def start(self, restart_from_run_id: UUID | None) -> StartRunResponse:
-        if restart_from_run_id is not None:
-            raise GameError(409, 'Restart Investigation is not available in this development phase.')
         with self.repository.transaction() as db:
-            run_id = self.repository.create_run(db)
-            return StartRunResponse(run_id=run_id, snapshot=self._snapshot(db, run_id), greeting=GREETING)
+            parent = str(restart_from_run_id) if restart_from_run_id else None
+            if parent:
+                previous = self._snapshot(db, parent)
+                if previous.status == 'active':
+                    self.repository.update_run_status(db, parent, 'abandoned')
+                    self.repository.append(db, parent, 'run_abandoned')
+            run_id = self.repository.create_run(db, parent)
+            index = self.repository.get_run(db, run_id)['run_index']
+            self.repository.set_belief(db, run_id, 'prior_dossier', project(db, index))
+            state = self._snapshot(db, run_id)
+            return StartRunResponse(run_id=run_id, snapshot=state, greeting=self._greeting(state))
+
+    @staticmethod
+    def _greeting(state):
+        return "Hello. I'm HELPER. I don't believe we've met." if state.run_index > 1 else GREETING
 
     def resume(self, run_id: UUID) -> RunResponse:
         with self.repository.transaction() as db:
-            return RunResponse(snapshot=self._snapshot(db, str(run_id)), greeting=GREETING)
+            state = self._snapshot(db, str(run_id))
+            return RunResponse(snapshot=state, greeting=self._greeting(state))
 
     @staticmethod
     def _metadata(file_id: FileId, state: RunState) -> FileMetadata:
+        if file_id == 'D01':
+            return FileMetadata(id='D01', path='/SYSTEM/HELPER_NOTES.TXT', title='HELPER_NOTES.TXT', app='explorer', unread=file_id not in state.opened_file_ids, modified=False)
         doc = MANIFEST[file_id]
         is_modified = file_id == 'F03' and 'C2_LOG_TAMPERING' in state.clues
         return FileMetadata(
@@ -219,7 +242,9 @@ class Director:
             state = self._snapshot(db, str(run_id))
 
             # Virtual display variant for F03 after C2
-            if file_id == 'F03' and 'C2_LOG_TAMPERING' in state.clues:
+            if file_id == 'D01':
+                content = notes(self.repository.get_beliefs(db, str(run_id))['prior_dossier'], state.run_index)
+            elif file_id == 'F03' and 'C2_LOG_TAMPERING' in state.clues:
                 content = F03_MODIFIED_CONTENT
             else:
                 content = MANIFEST[file_id].content
@@ -252,6 +277,16 @@ class Director:
             return PhotoResponse(snapshot=self._snapshot(db, str(run_id)), description=PHOTO_DESCRIPTIONS[choice])
 
     async def chat(self, run_id: UUID, message: str) -> ChatResponse:
+        with self.repository.transaction() as db:
+            state = self._snapshot(db, str(run_id))
+            self._active(state)
+            dossier = self.repository.get_beliefs(db, str(run_id)).get('prior_dossier')
+            if dossier and not state.memory_revealed and state.helper_chat_turns == 0:
+                self.repository.append(db, str(run_id), 'chat_category', payload={'category': question_category(message)})
+                self.repository.append(db, str(run_id), 'memory_revealed', payload={'source_event_id': dossier['source_event_id']})
+                self.repository.append(db, str(run_id), 'file_unlocked', 'D01')
+                return ChatResponse(reply=dossier['line'], emotion='defensive', intent='deflect',
+                    effects=[DirectorEffect(type='reveal_file', file_id='D01')], snapshot=self._snapshot(db, str(run_id)))
         # Pre-check state outside transaction
         current_state = self.resume(run_id).snapshot
         self._active(current_state)

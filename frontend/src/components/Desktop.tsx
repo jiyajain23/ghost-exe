@@ -21,6 +21,7 @@ import type {
 } from '../api/types';
 import { Documents } from '../apps/Documents';
 import { Helper, type Exchange } from '../apps/Helper';
+import { EndingScreen } from './EndingScreen';
 import { Window } from './Window';
 import { BootScreen } from './BootScreen';
 import { TopNavBar } from './TopNavBar';
@@ -160,9 +161,9 @@ export function Desktop() {
     return () => preference.removeEventListener('change', update);
   }, []);
 
-  function begin() {
+  function begin(restartFrom?: string) {
     void perform('Restoring workstation…', async () => {
-      const result = await startRun();
+      const result = await startRun(restartFrom);
       setSnapshot(result.snapshot);
       try {
         localStorage.setItem(SAVE_KEY, result.run_id);
@@ -183,13 +184,10 @@ export function Desktop() {
   }
 
   function restart() {
+    if (busy || !snapshot) return;
     generation.current += 1;
-    localStorage.removeItem(SAVE_KEY);
-    setSnapshot(null);
-    setFiles([]);
     setDocuments({});
-    setMessages([]);
-    begin();
+    begin(snapshot.run_id);
   }
 
   function read(id: FileId, target: 'explorer' | 'mail') {
@@ -230,8 +228,11 @@ export function Desktop() {
         // Fetch fresh state: documents may have been opened during inference.
         const current = await resumeRun(runId);
         if (requestGeneration !== generation.current) return;
+        const currentFiles = await getFiles(runId);
+        if (requestGeneration !== generation.current) return;
         applyState(current.snapshot);
-        setHelperStatus(result.fallback
+        setFiles(currentFiles);
+        setHelperStatus(result.effects.some(e => e.file_id === 'D01') ? 'Recovered: SYSTEM/HELPER_NOTES.TXT — open File Explorer.' : result.fallback
           ? 'HELPER connection interrupted or reply rejected. Scripted dialogue active; you can continue.'
           : 'HELPER ready');
         setMessages(entries => [...entries,
@@ -260,13 +261,17 @@ export function Desktop() {
         error={error}
         pending={pending}
         reduced={reduced}
-        onBegin={begin}
+        onBegin={() => begin()}
         onRetry={() => {
           void perform('Connecting to archive…', connect);
         }}
         onToggleReduced={setReduced}
       />
     );
+  }
+
+  if (snapshot.status === 'completed') {
+    return <EndingScreen snapshot={snapshot} onRestart={restart} />;
   }
 
   return (

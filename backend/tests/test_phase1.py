@@ -206,11 +206,11 @@ def test_inactive_run_cannot_mutate(client, store):
         assert client.post(f'/api/runs/{run_id}/{action}', json=body).status_code == 409
 
 
-def test_restart_not_silently_implemented(client, store):
+def test_explicit_restart_creates_run(client, store):
     run_id = start(client)['run_id']
-    assert client.post('/api/runs', json={'restart_from_run_id': run_id}).status_code == 409
+    assert client.post('/api/runs', json={'restart_from_run_id': run_id}).status_code == 201
     with store.transaction() as db:
-        assert db.execute('SELECT COUNT(*) FROM runs').fetchone()[0] == 1
+        assert db.execute('SELECT COUNT(*) FROM runs').fetchone()[0] == 2
 
 
 def test_post_cors_and_cross_origin_mutations(client, store):

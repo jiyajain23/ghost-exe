@@ -266,3 +266,24 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Keep app controls within short/narrow viewports; contents retain their scroll panes. */
+@media (max-width: 640px), (max-height: 600px) {
+  .window {
+    position: fixed !important;
+    inset: 36px 4px 38px !important;
+    width: auto !important;
+    max-width: none !important;
+    height: auto !important;
+    min-height: 0 !important;
+  }
+}
+.reduce-motion *::before,
+.reduce-motion *::after {
+  animation: none !important;
+  transition: none !important;
+}
+:focus-visible {
+  outline: 2px solid #e4a500 !important;
+  outline-offset: 2px;
+}

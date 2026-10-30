@@ -21,7 +21,14 @@ class Contract(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
 
+class EndingPresentation(Contract):
+    title: str
+    final_line: str
+    narrative: str
+
+
 class RunState(Contract):
+    ending_presentation: EndingPresentation | None = None
     run_id: UUID
     run_index: int = Field(ge=1, strict=True)
     status: RunStatus = 'active'

@@ -62,6 +62,10 @@ function snapshot(value: unknown): RunState {
   requireShape(v.photo_choice === null || v.photo_choice === 'inspect' || v.photo_choice === 'leave_sealed');
   requireShape(typeof v.memory_revealed === 'boolean' && typeof v.has_qualified_prior_run === 'boolean');
   requireShape(v.ending === null || typeof v.ending === 'string');
+  if (v.status === 'completed') {
+    const ending = object(v.ending_presentation);
+    requireShape(v.ending === 'DO_NOT_FORGET' && typeof ending.title === 'string' && typeof ending.final_line === 'string' && typeof ending.narrative === 'string');
+  }
   return v as unknown as RunState;
 }
 function metadata(value: unknown): FileMetadata {
@@ -88,8 +92,8 @@ function effects(value: unknown): DirectorEffect[] {
   });
 }
 const route = (id: string) => `/runs/${encodeURIComponent(id)}`;
-export async function startRun(): Promise<StartRunResponse> {
-  const v = object(await request('/runs', {})); const result = run(v);
+export async function startRun(restartFrom?: string): Promise<StartRunResponse> {
+  const v = object(await request('/runs', restartFrom ? { restart_from_run_id: restartFrom } : {})); const result = run(v);
   requireShape(v.run_id === result.snapshot.run_id);
   return { ...result, run_id: result.snapshot.run_id };
 }

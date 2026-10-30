@@ -60,7 +60,7 @@ def main():
                 assert result.json()['ending'] == 'DO_NOT_FORGET'
                 assert client.get(base).json()['snapshot']['status'] == 'completed'
                 print('REAL HTTP: outage fallback, hidden-file gate, C1-C4, all ten files, wrong-step rejection, ending and resume PASS', flush=True)
-        with server(Settings(agent_mode='ollama'), repository) as client:
+        with server(Settings(agent_mode='ollama'), Repository(Path(directory) / 'recovery.sqlite3')) as client:
             run = client.post('/api/runs', json={}).json()['run_id']
             result = client.post(f'/api/runs/{run}/chat', json={'message': 'Hello HELPER.'})
             assert result.status_code == 200
