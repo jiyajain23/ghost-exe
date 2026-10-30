@@ -20,7 +20,7 @@ export async function getHealth(): Promise<HealthResponse> {
   }
   return data as HealthResponse;
 }
-import type { ChatResponse, FileDocument, FileId, FileMetadata, OpenFileResponse, PhotoChoice,
+import type { DirectorEffect, ChatResponse, FileDocument, FileId, FileMetadata, OpenFileResponse, PhotoChoice,
   PhotoResponse, RunResponse, RunState, StartRunResponse } from './types';
 
 export class ApiError extends Error {
@@ -33,7 +33,7 @@ async function request(path: string, body?: unknown): Promise<unknown> {
       method: body === undefined ? 'GET' : 'POST',
       headers: body === undefined ? { Accept: 'application/json' } : { Accept: 'application/json', 'Content-Type': 'application/json' },
       body: body === undefined ? undefined : JSON.stringify(body),
-      signal: AbortSignal.timeout(25000), cache: 'no-store',
+      signal: AbortSignal.timeout(path.endsWith('/chat') ? 125000 : 25000), cache: 'no-store',
     });
   } catch { throw new ApiError('Cannot reach the local archive. Start the backend on 127.0.0.1:8000, then retry.'); }
   if (!response.ok) {
@@ -76,8 +76,16 @@ function run(value: unknown): RunResponse {
   const v = object(value); requireShape(typeof v.greeting === 'string');
   return { snapshot: snapshot(v.snapshot), greeting: v.greeting };
 }
-function noEffects(value: unknown): never[] {
-  requireShape(Array.isArray(value) && value.length === 0); return [];
+function effects(value: unknown): DirectorEffect[] {
+  requireShape(Array.isArray(value));
+  return value.map(raw => {
+    const e = object(raw);
+    requireShape(['flicker_screen', 'change_dialogue', 'reveal_file', 'plant_clue', 'fake_deletion'].includes(String(e.type)));
+    requireShape(e.duration_ms == null || (typeof e.duration_ms === 'number' && e.duration_ms >= 0 && e.duration_ms <= 1000));
+    for (const key of ['hint', 'message', 'target']) requireShape(e[key] == null || typeof e[key] === 'string');
+    requireShape(e.file_id == null || (typeof e.file_id === 'string' && /^(F0[1-9]|F10|D01)$/.test(e.file_id)));
+    return e as unknown as DirectorEffect;
+  });
 }
 const route = (id: string) => `/runs/${encodeURIComponent(id)}`;
 export async function startRun(): Promise<StartRunResponse> {
@@ -94,7 +102,7 @@ export async function openFile(id: string, fileId: FileId): Promise<OpenFileResp
   const v = object(await request(`${route(id)}/open-file`, { file_id: fileId })); const f = object(v.file); metadata(f);
   requireShape(typeof f.content === 'string' && (f.description === null || typeof f.description === 'string'));
   requireShape(Array.isArray(f.actions) && f.actions.every(a => a === 'inspect' || a === 'leave_sealed'));
-  return { file: f as unknown as FileDocument, snapshot: snapshot(v.snapshot), effects: noEffects(v.effects) };
+  return { file: f as unknown as FileDocument, snapshot: snapshot(v.snapshot), effects: effects(v.effects) };
 }
 export async function choosePhoto(id: string, choice: PhotoChoice): Promise<PhotoResponse> {
   const v = object(await request(`${route(id)}/photo-choice`, { choice })); requireShape(typeof v.description === 'string');
@@ -103,6 +111,13 @@ export async function choosePhoto(id: string, choice: PhotoChoice): Promise<Phot
 export async function sendChat(id: string, message: string): Promise<ChatResponse> {
   const v = object(await request(`${route(id)}/chat`, { message }));
   requireShape(typeof v.reply === 'string' && typeof v.emotion === 'string' && typeof v.intent === 'string');
-  return { reply: v.reply, emotion: v.emotion, intent: v.intent, snapshot: snapshot(v.snapshot), effects: noEffects(v.effects) };
+  requireShape(typeof v.fallback === 'boolean');
+  return { fallback: v.fallback, reply: v.reply, emotion: v.emotion, intent: v.intent, snapshot: snapshot(v.snapshot), effects: effects(v.effects) };
 }
 
+
+export async function contain(id: string, step: string) {
+  const v = object(await request(`${route(id)}/containment`, { step }));
+  requireShape(typeof v.message === 'string');
+  return { snapshot: snapshot(v.snapshot), message: v.message };
+}

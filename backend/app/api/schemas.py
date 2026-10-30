@@ -10,7 +10,11 @@ Clue = Literal['C1_ACCESS_CONTRADICTION', 'C2_LOG_TAMPERING', 'C3_LOCK_PROOF', '
 PhotoChoice = Literal['inspect', 'leave_sealed']
 ContainmentStep = Literal['ISOLATE', 'VERIFY', 'DISCONNECT']
 GhostEffect = Literal['none', 'flicker_screen', 'change_dialogue', 'reveal_file', 'plant_clue', 'fake_deletion']
-EventType = Literal['run_started', 'file_opened', 'photo_choice', 'chat_category', 'clue_unlocked', 'file_unlocked', 'ghost_effect', 'memory_revealed', 'containment_step', 'run_completed', 'run_abandoned']
+EventType = Literal[
+    'run_started', 'file_opened', 'photo_choice', 'chat_category',
+    'clue_unlocked', 'file_unlocked', 'ghost_effect', 'memory_revealed',
+    'containment_step', 'run_completed', 'run_abandoned'
+]
 
 
 class Contract(BaseModel):
@@ -81,6 +85,15 @@ class ClearHistoryAction(Contract):
         return value
 
 
+class DirectorEffect(Contract):
+    type: GhostEffect
+    duration_ms: int | None = None
+    file_id: FileId | None = None
+    hint: str | None = None
+    target: str | None = None
+    message: str | None = None
+
+
 class GhostReply(Contract):
     say: str = Field(min_length=1, max_length=240)
     emotion: Literal['calm', 'curious', 'defensive', 'frightened', 'possessive']
@@ -116,7 +129,7 @@ class FileDocument(FileMetadata):
 class OpenFileResponse(Contract):
     file: FileDocument
     snapshot: RunState
-    effects: list[dict] = Field(default_factory=list, max_length=0)  # No effects in Phase 1.
+    effects: list[DirectorEffect] = Field(default_factory=list)
 
 
 class PhotoResponse(Contract):
@@ -125,8 +138,20 @@ class PhotoResponse(Contract):
 
 
 class ChatResponse(Contract):
+    fallback: bool = False
     reply: str
     emotion: Literal['calm', 'curious', 'defensive', 'frightened', 'possessive']
     intent: Literal['assist', 'deflect', 'deceive', 'warn', 'plead']
-    effects: list[dict] = Field(default_factory=list, max_length=0)
+    effects: list[DirectorEffect] = Field(default_factory=list)
     snapshot: RunState
+
+
+class ContainmentResponse(Contract):
+    snapshot: RunState
+    effects: list[DirectorEffect] = Field(default_factory=list)
+    message: str
+    ending: Literal['DO_NOT_FORGET'] | None = None
+
+
+class ClearHistoryResponse(Contract):
+    cleared: StrictBool = True

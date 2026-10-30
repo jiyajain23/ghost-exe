@@ -12,6 +12,17 @@ class Settings(BaseModel):
     ollama_model: str = 'gemma3:1b'
     model_timeout_seconds: float = Field(default=20, gt=0, le=120)
 
+    @field_validator('ollama_model')
+    @classmethod
+    def local_gemma_only(cls, value: str) -> str:
+        # Do not allow cloud model aliases through the local Ollama daemon.
+        import re
+        if not re.fullmatch(r'gemma3:(?:1b|4b|12b|27b)(?:-[a-zA-Z0-9_]+)*', value):
+            raise ValueError('OLLAMA_MODEL must be a local Gemma 3 size/tag, e.g. gemma3:1b')
+        if 'cloud' in value.lower():
+            raise ValueError('Cloud models are not permitted')
+        return value
+
     @field_validator('ollama_base_url')
     @classmethod
     def loopback_only(cls, value: str) -> str:

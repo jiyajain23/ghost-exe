@@ -77,21 +77,24 @@ def test_forged_file_inputs(client, payload):
 def test_open_each_initial_file_idempotently(client, store):
     base = f"/api/runs/{start(client)['run_id']}"
     for file_id in INITIAL_FILES:
-        for _ in range(2):
+        for attempt in range(2):
             response = client.post(base + '/open-file', json={'file_id': file_id})
             assert response.status_code == 200
             assert response.json()['file']['content'] == MANIFEST[file_id].content
-            assert response.json()['effects'] == []
+            if file_id == 'F05' and attempt == 0:
+                assert response.json()['effects'] == [{'type': 'reveal_file', 'file_id': 'F06', 'duration_ms': None, 'hint': None, 'message': None, 'target': None}]
+            else:
+                assert response.json()['effects'] == []
     state = client.get(base).json()['snapshot']
     assert state['opened_file_ids'] == list(INITIAL_FILES)
-    # Phase 2 transitions are deliberately absent; reading cannot skip the phase boundary.
-    assert state['visible_file_ids'] == list(INITIAL_FILES)
-    assert state['clues'] == [] and state['ending'] is None
-    assert state['fear'] == 0 and state['trust'] == 65
-    assert all(not f['unread'] for f in client.get(base + '/files').json()['files'])
+    # In Phase 2: F05 opens F06; F03+F04 triggers C1
+    assert state['visible_file_ids'] == list(INITIAL_FILES) + ['F06']
+    assert state['clues'] == ['C1_ACCESS_CONTRADICTION'] and state['ending'] is None
+    assert state['fear'] == 0 and state['trust'] == 55
+    assert all(not f['unread'] for f in client.get(base + '/files').json()['files'] if f['id'] in INITIAL_FILES)
     with store.transaction() as db:
         assert db.execute("SELECT COUNT(*) FROM events WHERE type='file_opened'").fetchone()[0] == 5
-    assert client.post(base + '/containment', json={'step': 'DISCONNECT'}).status_code == 404
+    assert client.post(base + '/containment', json={'step': 'DISCONNECT'}).status_code == 409
     assert client.post(base + '/open-file', json={'file_id': 'F08'}).status_code == 404
 
 

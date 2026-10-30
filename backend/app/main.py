@@ -6,6 +6,8 @@ from fastapi.responses import JSONResponse
 
 from app.api.schemas import HealthResponse
 from app.config import Settings
+from app.ghost.ollama import OllamaGhostAdapter
+from app.ghost.adapter import MockGhostAdapter
 from app.api.routes import game_routes
 from app.director.game import Director, GameError
 from app.storage.repository import Repository
@@ -43,7 +45,8 @@ def create_app(settings: Settings | None = None, repository: Repository | None =
     async def storage_error(request: Request, error: Exception):
         return JSONResponse({'detail': 'Local save is unavailable. Close other game servers and retry.'}, status_code=503)
 
-    application.include_router(game_routes(Director(repository or Repository(), timeout=settings.model_timeout_seconds)))
+    ghost = OllamaGhostAdapter(settings) if settings.agent_mode == 'ollama' else MockGhostAdapter()
+    application.include_router(game_routes(Director(repository or Repository(), ghost, timeout=settings.model_timeout_seconds)))
 
     @application.get('/api/health', response_model=HealthResponse)
     def health() -> HealthResponse:

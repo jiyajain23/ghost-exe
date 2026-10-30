@@ -2,9 +2,11 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException
 
-from app.api.schemas import (ChatAction, ChatResponse, FilesResponse, OpenFileAction,
-                             OpenFileResponse, PhotoChoiceAction, PhotoResponse,
-                             RunResponse, StartRunAction, StartRunResponse)
+from app.api.schemas import (ChatAction, ChatResponse, ClearHistoryAction,
+                              ClearHistoryResponse, ContainmentAction,
+                              ContainmentResponse, FilesResponse, OpenFileAction,
+                              OpenFileResponse, PhotoChoiceAction, PhotoResponse,
+                              RunResponse, StartRunAction, StartRunResponse)
 from app.director.game import Director
 
 
@@ -39,5 +41,13 @@ def game_routes(director: Director) -> APIRouter:
     @router.post('/runs/{run_id}/chat', response_model=ChatResponse)
     async def chat(run_id: UUID, action: ChatAction):
         return await director.chat(run_id, action.message)
+
+    @router.post('/runs/{run_id}/containment', response_model=ContainmentResponse)
+    def containment(run_id: UUID, action: ContainmentAction):
+        return director.containment(run_id, action.step)
+
+    @router.post('/history/clear', response_model=ClearHistoryResponse)
+    def clear_history(action: ClearHistoryAction):
+        return director.clear_history(action.confirm)
 
     return router
