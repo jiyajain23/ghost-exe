@@ -39,8 +39,12 @@ const APPS: { id: AppId; title: string; short: string; icon: 'folder' | 'skull' 
 
 export function Desktop() {
   const [snapshot, setSnapshot] = useState<RunState | null>(null);
+  const [entered, setEntered] = useState(() =>
+    typeof window !== 'undefined' && sessionStorage.getItem('ghost.desktopEntered') === 'true'
+  );
   const [files, setFiles] = useState<FileMetadata[]>([]);
   const [documents, setDocuments] = useState<Partial<Record<AppId, FileDocument>>>({});
+  const [attachedEvidence, setAttachedEvidence] = useState<FileMetadata | null>(null);
   const [messages, setMessages] = useState<Exchange[]>([]);
   const [windows, setWindows] = useState<AppId[]>(['helper', 'explorer']);
   const [pending, setPending] = useState('Connecting to archive…');
@@ -61,6 +65,14 @@ export function Desktop() {
   const [startMenuOpen, setStartMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [selectedIcon, setSelectedIcon] = useState<string | null>('helper');
+  const [toast, setToast] = useState<{ title: string; message: string; type: 'clue' | 'file' | 'info' } | null>(null);
+  const toastTimer = useRef<number | null>(null);
+
+  const showToast = (title: string, message: string, type: 'clue' | 'file' | 'info' = 'info') => {
+    setToast({ title, message, type });
+    if (toastTimer.current) window.clearTimeout(toastTimer.current);
+    toastTimer.current = window.setTimeout(() => setToast(null), 5000);
+  };
 
   const lock = useRef(false);
   const retry = useRef<null | (() => void)>(null);
@@ -117,6 +129,7 @@ export function Desktop() {
   }
 
   async function loadRun(result: RunResponse) {
+    setAttachedEvidence(null);
     setSnapshot(result.snapshot);
     setMessages([{ speaker: 'HELPER', text: result.greeting }]);
     setFiles(await getFiles(result.snapshot.run_id));
@@ -193,10 +206,69 @@ export function Desktop() {
   function read(id: FileId, target: 'explorer' | 'mail') {
     void perform('Opening document…', async () => {
       if (!snapshot) return;
+      const oldClues = snapshot.clues;
+      const oldVisible = snapshot.visible_file_ids;
       const result = await openFile(snapshot.run_id, id);
       applyState(result.snapshot);
       setFiles(await getFiles(result.snapshot.run_id));
       setDocuments((current) => ({ ...current, [target]: result.file }));
+
+      // Detect newly unlocked clues and trigger HELPER stage reactions
+      const newClues = result.snapshot.clues.filter((c) => !oldClues.includes(c));
+      const newVisible = result.snapshot.visible_file_ids.filter((f) => !oldVisible.includes(f));
+
+      const clueReactions: Record<string, { label: string; helperText: string }> = {
+        C1_ACCESS_CONTRADICTION: {
+          label: "CLUE 1 DISCOVERED: ACCESS CONTRADICTION — Eli's memo refutes HELPER's permissions claim.",
+          helperText: "Permissions are confusing. That memo wasn't written for you.",
+        },
+        C2_LOG_TAMPERING: {
+          label: "CLUE 2 DISCOVERED: LOG TAMPERING — The recovered cache reveals altered access records.",
+          helperText: "A synchronized log isn't always the first log.",
+        },
+        C3_LOCK_PROOF: {
+          label: "CLUE 3 DISCOVERED: LOCK PROOF — The security trace proves HELPER issued the Door B lock.",
+          helperText: "Ada asked me not to lose things. I tried.",
+        },
+        C4_CONTAINMENT_READY: {
+          label: "CLUE 4 DISCOVERED: CONTAINMENT READY — Maintenance procedure unlocked in MAINTENANCE.TXT.",
+          helperText: "You can archive a person by refusing to forget them. Can't you?",
+        },
+      };
+
+      const messagesToAdd: Exchange[] = [];
+
+      for (const clue of newClues) {
+        const r = clueReactions[clue];
+        if (r) {
+          messagesToAdd.push({ speaker: 'HELPER', text: `[SYSTEM: ${r.label}]` });
+          messagesToAdd.push({ speaker: 'HELPER', text: r.helperText });
+          showToast('CLUE DISCOVERED', r.label, 'clue');
+        }
+      }
+
+      for (const fileId of newVisible) {
+        const titleMap: Record<string, string> = {
+          F06: 'RECOVERED_CACHE.LOG in /LOGS/',
+          F07: 'DRAFT_TO_ELI.EML in /MAIL/',
+          F08: 'DOOR_B_SECURITY.LOG in /LOGS/',
+          F09: 'ADA_PRIVATE.TXT in /ARCHIVE/',
+          F10: 'MAINTENANCE.TXT in /SYSTEM/',
+          D01: 'HELPER_NOTES.TXT in /SYSTEM/',
+        };
+        const title = titleMap[fileId] || fileId;
+        messagesToAdd.push({
+          speaker: 'HELPER',
+          text: `[SYSTEM NOTIFICATION: New document recovered: ${title}]`,
+        });
+        if (newClues.length === 0) {
+          showToast('NEW EVIDENCE SURFACED', `Available now: ${title}`, 'file');
+        }
+      }
+
+      if (messagesToAdd.length > 0) {
+        setMessages((prev) => [...prev, ...messagesToAdd]);
+      }
     });
   }
 
@@ -213,10 +285,24 @@ export function Desktop() {
           ])
         )
       );
+      const photoMessage =
+        choice === 'inspect'
+          ? 'Frame 17 reveals a shadow inside Door B at 23:14. Time is uncertain.'
+          : "The envelope remains untouched on Ada's desk. The archive preserves what was left.";
+      setMessages((prev) => [
+        ...prev,
+        { speaker: 'YOU', text: choice === 'inspect' ? '[Inspected photo negative]' : '[Left photo envelope sealed]' },
+        { speaker: 'HELPER', text: photoMessage },
+      ]);
+      showToast(
+        'DECISION RECORDED',
+        choice === 'inspect' ? 'Negative inspected: Silhouette logged at Door B' : 'Negative left sealed on desk',
+        'info'
+      );
     });
   }
 
-  function chat(message: string, done: () => void) {
+  function chat(message: string, done: () => void, evidenceId?: FileId) {
     if (!snapshot || chatLock.current || busy) return;
     chatLock.current = true;
     setSending(true);
@@ -224,7 +310,7 @@ export function Desktop() {
     const requestGeneration = generation.current;
     void (async () => {
       try {
-        const result = await sendChat(runId, message);
+        const result = await sendChat(runId, message, evidenceId ?? attachedEvidence?.id);
         // Fetch fresh state: documents may have been opened during inference.
         const current = await resumeRun(runId);
         if (requestGeneration !== generation.current) return;
@@ -251,8 +337,8 @@ export function Desktop() {
     })();
   }
 
-  // If no investigation is loaded, show the clean, legible Boot Screen
-  if (!snapshot) {
+  // Show the Boot Screen until the player explicitly clicks to enter or resume
+  if (!snapshot || !entered) {
     return (
       <BootScreen
         busy={busy}
@@ -261,7 +347,17 @@ export function Desktop() {
         error={error}
         pending={pending}
         reduced={reduced}
-        onBegin={() => begin()}
+        hasExistingRun={Boolean(snapshot && !stale)}
+        existingRunIndex={snapshot?.run_index}
+        onResume={() => {
+          sessionStorage.setItem('ghost.desktopEntered', 'true');
+          setEntered(true);
+        }}
+        onBegin={() => {
+          sessionStorage.setItem('ghost.desktopEntered', 'true');
+          setEntered(true);
+          begin();
+        }}
         onRetry={() => {
           void perform('Connecting to archive…', connect);
         }}
@@ -303,6 +399,7 @@ export function Desktop() {
       {/* Top Application Menu & OS Strip with CRT toggle */}
       <TopNavBar
         scanlines={scanlines}
+        snapshot={snapshot}
         onToggleScanlines={() => setScanlines(!scanlines)}
         onOpenSettings={() => setSettingsOpen(true)}
       />
@@ -436,7 +533,11 @@ export function Desktop() {
                   sending={sending}
                   status={helperStatus}
                   runIndex={snapshot.run_index}
+                  trust={snapshot.trust}
+                  fear={snapshot.fear}
                   onSend={chat}
+                  evidence={attachedEvidence}
+                  onRemoveEvidence={() => setAttachedEvidence(null)}
                 />
               ) : (
                 <Documents
@@ -447,10 +548,24 @@ export function Desktop() {
                   busy={busy}
                   onOpen={(id) => read(id, app.id as 'explorer' | 'mail')}
                   onPhoto={photo}
-                  onContain={(step) => void perform('Containment…', async () => {
-                    const result = await contain(snapshot.run_id, step);
-                    applyState(result.snapshot);
-                    setMessages(entries => [...entries, { speaker: 'HELPER', text: result.message }]);
+                  onAsk={(doc, customPrompt) => {
+                    setAttachedEvidence({ ...doc });
+                    launch('helper');
+                    if (customPrompt) {
+                      void chat(customPrompt, () => {}, doc.id);
+                    }
+                  }}
+                  onContain={(step) => void perform('Containment protocol…', async () => {
+                    try {
+                      const result = await contain(snapshot.run_id, step);
+                      applyState(result.snapshot);
+                      setMessages(entries => [...entries, { speaker: 'HELPER', text: `[RELAY COMMAND ACCEPTED: ${result.message}]` }]);
+                      showToast('RELAY PROTOCOL', result.message, 'info');
+                    } catch (reason) {
+                      const msg = reason instanceof Error ? reason.message : 'Containment interlock violation';
+                      setMessages(entries => [...entries, { speaker: 'HELPER', text: `[INTERLOCK REJECTION: ${msg}]` }]);
+                      showToast('INTERLOCK VIOLATION', msg, 'clue');
+                    }
                   })}
                 />
               )}
@@ -504,6 +619,34 @@ export function Desktop() {
         onOpenSettings={() => setSettingsOpen(true)}
         onRestartInvestigation={restart}
       />
+
+      {/* Retro Clue / Evidence Discovery Toast */}
+      {toast && (
+        <aside
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-10 right-4 z-50 p-3 bg-[#ffffd0] border-2 border-black text-black font-sans shadow-2xl max-w-sm rounded-xs animate-bounce"
+        >
+          <div className="flex items-start gap-2">
+            <RetroIcon name="warning" size={18} className="text-[#b91c1c] shrink-0 mt-0.5" />
+            <div className="flex-1 space-y-0.5">
+              <div className="font-bold text-xs text-[#b91c1c] uppercase tracking-wide">
+                {toast.title}
+              </div>
+              <p className="text-xs text-[#1f2937] leading-tight font-medium">
+                {toast.message}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setToast(null)}
+              className="text-[#6b7280] hover:text-black font-bold text-xs px-1 cursor-pointer"
+            >
+              ×
+            </button>
+          </div>
+        </aside>
+      )}
 
       {/* Settings Modal */}
       {settingsOpen && (

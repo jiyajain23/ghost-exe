@@ -67,6 +67,7 @@ class PhotoChoiceAction(Contract):
 
 
 class ChatAction(Contract):
+    evidence_id: FileId | None = None
     message: str = Field(min_length=1, max_length=500)
 
     @field_validator('message')

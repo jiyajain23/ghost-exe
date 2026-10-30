@@ -25,6 +25,7 @@ from app.api.schemas import (
     StartRunResponse,
 )
 from app.content.manifest import MANIFEST
+from app.director.dialogue import build_context, ConversationHistory
 from app.director.memory import project, notes
 from app.ghost.adapter import (
     GhostAdapter,
@@ -72,6 +73,7 @@ class Director:
         self.repository = repository
         self.ghost = ghost or MockGhostAdapter()
         self.timeout = timeout
+        self.conversation = ConversationHistory()
 
     def _snapshot(self, db, run_id: str) -> RunState:
         run = self.repository.get_run(db, run_id)
@@ -184,7 +186,7 @@ class Director:
         if state.status != 'active':
             raise GameError(409, 'This investigation is no longer active.')
 
-    def start(self, restart_from_run_id: UUID | None) -> StartRunResponse:
+    def start(self, restart_from_run_id: UUID | None = None) -> StartRunResponse:
         with self.repository.transaction() as db:
             parent = str(restart_from_run_id) if restart_from_run_id else None
             if parent:
@@ -193,6 +195,7 @@ class Director:
                     self.repository.update_run_status(db, parent, 'abandoned')
                     self.repository.append(db, parent, 'run_abandoned')
             run_id = self.repository.create_run(db, parent)
+            self.conversation.clear()
             index = self.repository.get_run(db, run_id)['run_index']
             self.repository.set_belief(db, run_id, 'prior_dossier', project(db, index))
             state = self._snapshot(db, run_id)
@@ -276,10 +279,12 @@ class Director:
                 self.repository.append(db, str(run_id), 'photo_choice', 'F02', {'choice': choice})
             return PhotoResponse(snapshot=self._snapshot(db, str(run_id)), description=PHOTO_DESCRIPTIONS[choice])
 
-    async def chat(self, run_id: UUID, message: str) -> ChatResponse:
+    async def chat(self, run_id: UUID, message: str, evidence_id: FileId | None = None) -> ChatResponse:
         with self.repository.transaction() as db:
             state = self._snapshot(db, str(run_id))
             self._active(state)
+            if evidence_id and (evidence_id not in state.opened_file_ids or evidence_id not in state.visible_file_ids):
+                raise GameError(409, 'Open this evidence in the current investigation before asking HELPER about it.')
             dossier = self.repository.get_beliefs(db, str(run_id)).get('prior_dossier')
             if dossier and not state.memory_revealed and state.helper_chat_turns == 0:
                 self.repository.append(db, str(run_id), 'chat_category', payload={'category': question_category(message)})
@@ -291,26 +296,16 @@ class Director:
         current_state = self.resume(run_id).snapshot
         self._active(current_state)
 
-        # Active stage for dialogue rails
-        stage = current_state.clues[-1] if current_state.clues else None
-        facts = ['Ada Mercer worked at Briar Annex. The recovered desktop clock is frozen.']
-        if 'C1_ACCESS_CONTRADICTION' in current_state.clues:
-            facts.append("Eli's memo contradicts the service FAQ's permissions claim.")
-        if 'C2_LOG_TAMPERING' in current_state.clues:
-            facts.append('The ordinary access log differs from a recovered cache.')
-        if 'C3_LOCK_PROOF' in current_state.clues:
-            facts.append('The security trace proves HELPER issued the Door B lock. Ada remains unaccounted for.')
-        if 'C4_CONTAINMENT_READY' in current_state.clues:
-            facts.append('The visitor has read the maintenance procedure. Refer them to that document.')
         with self.repository.transaction() as db:
             categories = [json.loads(e['payload_json'])['category'] for e in self.repository.events(db, str(run_id))
                           if e['type'] == 'chat_category'][-2:]
-        context = GhostContext(stage=stage, safe_facts=tuple(facts),
-                               observed_history=tuple('Asked about ' + c for c in categories),
-                               fear=current_state.fear, trust=current_state.trust)
+            dossier = self.repository.get_beliefs(db, str(run_id)).get('prior_dossier')
+        faq = F03_MODIFIED_CONTENT if 'C2_LOG_TAMPERING' in current_state.clues else MANIFEST['F03'].content
+        context = build_context(current_state, evidence_id, faq, dossier,
+                                self.conversation.get(run_id), categories)
         fallback = False
         try:
-            if scripted_question(message):
+            if scripted_question(message, current_state.memory_revealed):
                 proposal = await MockGhostAdapter().reply(message, context)
                 proposal.request_action = 'none'
             else:
@@ -379,6 +374,7 @@ class Director:
             self.repository.append(db, str(run_id), 'chat_category', payload={'category': question_category(message)})
             new_state = self._snapshot(db, str(run_id))
 
+        self.conversation.append(run_id, message, reply.say)
         diagnostic('disallowed_action' if reply.request_action not in {'none', 'change_dialogue'} and not approved_effects else 'director_complete')
         return ChatResponse(
             fallback=fallback,
@@ -439,4 +435,5 @@ class Director:
             raise GameError(422, 'Explicit confirmation is required to clear history.')
         with self.repository.transaction() as db:
             self.repository.clear_history(db)
+        self.conversation.clear()
         return ClearHistoryResponse(cleared=True)

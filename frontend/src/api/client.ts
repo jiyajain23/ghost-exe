@@ -112,8 +112,8 @@ export async function choosePhoto(id: string, choice: PhotoChoice): Promise<Phot
   const v = object(await request(`${route(id)}/photo-choice`, { choice })); requireShape(typeof v.description === 'string');
   return { snapshot: snapshot(v.snapshot), description: v.description };
 }
-export async function sendChat(id: string, message: string): Promise<ChatResponse> {
-  const v = object(await request(`${route(id)}/chat`, { message }));
+export async function sendChat(id: string, message: string, evidenceId?: FileId): Promise<ChatResponse> {
+  const v = object(await request(`${route(id)}/chat`, { message, evidence_id: evidenceId }));
   requireShape(typeof v.reply === 'string' && typeof v.emotion === 'string' && typeof v.intent === 'string');
   requireShape(typeof v.fallback === 'boolean');
   return { fallback: v.fallback, reply: v.reply, emotion: v.emotion, intent: v.intent, snapshot: snapshot(v.snapshot), effects: effects(v.effects) };

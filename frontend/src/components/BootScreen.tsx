@@ -8,6 +8,9 @@ interface BootScreenProps {
   error: string;
   pending: string;
   reduced: boolean;
+  hasExistingRun?: boolean;
+  existingRunIndex?: number;
+  onResume?: () => void;
   onBegin: () => void;
   onRetry?: () => void;
   onToggleReduced: (value: boolean) => void;
@@ -20,6 +23,9 @@ export const BootScreen: FC<BootScreenProps> = ({
   error,
   pending,
   reduced,
+  hasExistingRun = false,
+  existingRunIndex = 1,
+  onResume,
   onBegin,
   onRetry,
   onToggleReduced,
@@ -139,29 +145,56 @@ export const BootScreen: FC<BootScreenProps> = ({
               </div>
             )}
 
-            {/* Primary Action Button - Prominent, Large, High Contrast */}
+            {/* Primary Action Buttons */}
             <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="text-xs text-[#9ca3af] font-mono">
                 {stale
                   ? 'Previous run expired or not found on server.'
-                  : 'Ready to mount desktop filesystem.'}
+                  : hasExistingRun
+                  ? `Active investigation detected in memory (Run #${existingRunIndex}).`
+                  : 'Ready to mount recovered workstation image.'}
               </div>
 
-              <button
-                type="button"
-                onClick={onBegin}
-                disabled={busy || (!connected && !stale)}
-                className="w-full sm:w-auto px-8 py-3.5 bg-[#008080] hover:bg-[#006565] active:bg-[#004f4f] text-white font-bold text-sm md:text-base uppercase tracking-wider border-2 border-[#76d6d5] shadow-xl transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 rounded-sm"
-              >
-                <RetroIcon name="play" size={16} fill="#ffffff" />
-                <span>
-                  {pending
-                    ? pending
-                    : stale
-                    ? 'Start New Investigation'
-                    : 'Begin Investigation'}
-                </span>
-              </button>
+              <div className="flex flex-wrap items-center gap-3">
+                {hasExistingRun && onResume ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={onResume}
+                      disabled={busy || !connected}
+                      className="px-6 py-3 bg-[#008080] hover:bg-[#006565] active:bg-[#004f4f] text-white font-bold text-sm md:text-base uppercase tracking-wider border-2 border-[#76d6d5] shadow-xl transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 rounded-sm"
+                    >
+                      <RetroIcon name="play" size={16} fill="#ffffff" />
+                      <span>{pending ? pending : `Resume Run #${existingRunIndex}`}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={onBegin}
+                      disabled={busy || !connected}
+                      className="px-4 py-3 bg-[#1f2428] hover:bg-[#374151] text-[#e5e7eb] font-bold text-xs uppercase tracking-wider border border-[#4b5563] shadow-md transition-all cursor-pointer disabled:opacity-50 flex items-center gap-2 rounded-sm"
+                    >
+                      <span>New Investigation</span>
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={onBegin}
+                    disabled={busy || (!connected && !stale)}
+                    className="w-full sm:w-auto px-8 py-3.5 bg-[#008080] hover:bg-[#006565] active:bg-[#004f4f] text-white font-bold text-sm md:text-base uppercase tracking-wider border-2 border-[#76d6d5] shadow-xl transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 rounded-sm"
+                  >
+                    <RetroIcon name="play" size={16} fill="#ffffff" />
+                    <span>
+                      {pending
+                        ? pending
+                        : stale
+                        ? 'Start New Investigation'
+                        : 'Begin Investigation'}
+                    </span>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 

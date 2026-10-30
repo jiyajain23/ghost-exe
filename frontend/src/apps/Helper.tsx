@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FC } from 'react';
+import type { FileMetadata } from '../api/types';
 import { RetroIcon } from '../components/RetroIcons';
 
 export interface Exchange {
@@ -7,11 +8,15 @@ export interface Exchange {
 }
 
 interface HelperProps {
+  evidence: FileMetadata | null;
+  onRemoveEvidence: () => void;
   messages: Exchange[];
   busy: boolean;
   sending: boolean;
   status: string;
   runIndex?: number;
+  trust?: number;
+  fear?: number;
   onSend: (message: string, done: () => void) => void;
 }
 
@@ -23,14 +28,24 @@ const QUICK_PROMPTS = [
 ];
 
 export const Helper: FC<HelperProps> = ({
+  evidence,
+  onRemoveEvidence,
   messages,
   busy,
   sending,
   status,
   runIndex = 1,
+  trust = 65,
+  fear = 0,
   onSend,
 }) => {
   const [message, setMessage] = useState('');
+  useEffect(() => {
+    if (evidence) {
+      setMessage(`What does ${evidence.title} tell us?`);
+      requestAnimationFrame(() => document.getElementById('chat-message')?.focus());
+    }
+  }, [evidence]);
   const [showTelemetry, setShowTelemetry] = useState(false);
   const historyRef = useRef<HTMLDivElement>(null);
 
@@ -53,10 +68,16 @@ export const Helper: FC<HelperProps> = ({
         <div className="flex items-center gap-2">
           <span className="flex items-center gap-1 font-bold text-[#006565]">
             <span className="w-2 h-2 rounded-full bg-[#22c55e] inline-block" />
-            ONLINE (127.0.0.1:8000)
+            ONLINE
           </span>
           <span className="text-[#808080]">|</span>
-          <span className="text-[#b91c1c] font-bold">SIGNAL: 83.4% UNSTABLE</span>
+          <span className={`font-bold ${trust <= 35 ? 'text-[#b91c1c] animate-pulse' : 'text-[#006565]'}`}>
+            TRUST: {trust}%
+          </span>
+          <span className="text-[#808080]">|</span>
+          <span className={`font-bold ${fear >= 15 ? 'text-[#b91c1c]' : 'text-[#4b5563]'}`}>
+            FEAR: {fear}%
+          </span>
           <span className="text-[#808080]">|</span>
           <span className="text-[#4b5563]">RUN #{String(runIndex).padStart(3, '0')}</span>
         </div>
@@ -200,6 +221,10 @@ export const Helper: FC<HelperProps> = ({
         </div>
       </div>
 
+      {evidence && <div role="status" className="p-2 bg-white text-black text-xs">
+        Attached evidence: {evidence.title}
+        <button type="button" className="w98-btn ml-2 p-1" onClick={onRemoveEvidence}>Remove evidence</button>
+      </div>}
       {/* Investigator Command Bus / Chat Input Area */}
       <form
         onSubmit={(e) => {

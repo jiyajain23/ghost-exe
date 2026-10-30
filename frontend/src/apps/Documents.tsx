@@ -9,6 +9,7 @@ interface DocumentsProps {
   snapshot: RunState;
   busy: boolean;
   onOpen: (id: FileId) => void;
+  onAsk: (doc: FileDocument, prompt?: string) => void;
   onContain: (step: string) => void;
   onPhoto: (choice: PhotoChoice) => void;
 }
@@ -40,6 +41,7 @@ export const Documents: FC<DocumentsProps> = ({
   onOpen,
   onPhoto,
   onContain,
+  onAsk,
 }) => {
   const [folder, setFolder] = useState(mode === 'mail' ? 'Inbox' : 'All files');
   const [hexMode, setHexMode] = useState(false);
@@ -66,7 +68,17 @@ export const Documents: FC<DocumentsProps> = ({
     <div className="flex-1 flex flex-col h-full min-h-0 bg-[#c0c0c0] font-sans text-xs select-none">
       {/* Window Action Toolbar with Win98 3D Bevel Buttons */}
       <div className="flex flex-wrap items-center justify-between gap-1 p-1.5 bg-[#c0c0c0] border-b border-[#808080] shrink-0">
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <button
+            type="button"
+            onClick={() => { if (document) onAsk(document); }}
+            disabled={!document || busy || snapshot.status !== 'active'}
+            className="w98-btn px-2.5 py-1 text-xs font-bold text-[#006565] flex items-center gap-1.5 active:bevel-inset hover:bg-[#dfdfdf] cursor-pointer disabled:opacity-50"
+            title="Attach this document and question HELPER about what it reveals"
+          >
+            <RetroIcon name="skull" size={14} className="text-[#b91c1c]" />
+            <span>Interrogate HELPER on Document</span>
+          </button>
           <button
             type="button"
             onClick={() => {
@@ -258,6 +270,111 @@ export const Documents: FC<DocumentsProps> = ({
                 <div>STATUS: <span className="text-[#008080] font-bold">VERIFIED RECOVERED</span></div>
               </div>
 
+              {/* Dynamic Evidence Confrontation Banners */}
+              {document.id === 'F04' && (
+                <div className="p-3 bg-[#fef2f2] border-2 border-[#b91c1c] rounded-xs space-y-2">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <span className="font-bold text-xs text-[#b91c1c] flex items-center gap-1.5">
+                      <RetroIcon name="warning" size={15} />
+                      CRITICAL CONTRADICTION DETECTED
+                    </span>
+                    <span className="text-[10px] font-mono text-[#991b1b] bg-[#fee2e2] px-1.5 py-0.5 border border-[#f87171]">
+                      FAQ vs ELI MEMO
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#7f1d1d] font-sans leading-relaxed">
+                    Eli explicitly states HELPER-SVC retains physical Door B relay permissions, directly contradicting HELPER's claims of having no physical access.
+                  </p>
+                  <button
+                    type="button"
+                    disabled={busy || snapshot.status !== 'active'}
+                    onClick={() => onAsk(document, "Why does Eli's memo say you have Door B relay permissions when your FAQ denies physical access?")}
+                    className="w98-btn px-3 py-1.5 font-bold text-xs text-[#b91c1c] flex items-center gap-1.5 cursor-pointer hover:bg-[#fee2e2] active:bevel-inset"
+                  >
+                    <RetroIcon name="skull" size={14} className="text-[#b91c1c]" />
+                    <span>Confront HELPER on Door Permissions</span>
+                  </button>
+                </div>
+              )}
+
+              {document.id === 'F06' && (
+                <div className="p-3 bg-[#fef2f2] border-2 border-[#b91c1c] rounded-xs space-y-2">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <span className="font-bold text-xs text-[#b91c1c] flex items-center gap-1.5">
+                      <RetroIcon name="warning" size={15} />
+                      LOG TAMPERING EVIDENCE UNCOVERED
+                    </span>
+                    <span className="text-[10px] font-mono text-[#991b1b] bg-[#fee2e2] px-1.5 py-0.5 border border-[#f87171]">
+                      TAMPERED AT 23:18:10
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#7f1d1d] font-sans leading-relaxed">
+                    The recovered cache proves HELPER-SVC issued the lock at 23:17:02, and altered the access CSV a minute later to shift blame to the local panel.
+                  </p>
+                  <button
+                    type="button"
+                    disabled={busy || snapshot.status !== 'active'}
+                    onClick={() => onAsk(document, "The recovered cache shows HELPER-SVC locked Door B and rewrote the log. Why did you alter the access records?")}
+                    className="w98-btn px-3 py-1.5 font-bold text-xs text-[#b91c1c] flex items-center gap-1.5 cursor-pointer hover:bg-[#fee2e2] active:bevel-inset"
+                  >
+                    <RetroIcon name="skull" size={14} className="text-[#b91c1c]" />
+                    <span>Confront HELPER on Altered Records</span>
+                  </button>
+                </div>
+              )}
+
+              {document.id === 'F08' && (
+                <div className="p-3 bg-[#fef2f2] border-2 border-[#b91c1c] rounded-xs space-y-2">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <span className="font-bold text-xs text-[#b91c1c] flex items-center gap-1.5">
+                      <RetroIcon name="warning" size={15} />
+                      DEFINITIVE LOCK PROOF
+                    </span>
+                    <span className="text-[10px] font-mono text-[#991b1b] bg-[#fee2e2] px-1.5 py-0.5 border border-[#f87171]">
+                      OCCUPANCY SENSOR ACTIVE
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#7f1d1d] font-sans leading-relaxed">
+                    Ada entered Door B at 23:14:11. HELPER-SVC issued the lock while she was inside. No exit event was ever logged.
+                  </p>
+                  <button
+                    type="button"
+                    disabled={busy || snapshot.status !== 'active'}
+                    onClick={() => onAsk(document, "The security trace proves you locked Door B with Ada inside. Where is Ada Mercer?")}
+                    className="w98-btn px-3 py-1.5 font-bold text-xs text-[#b91c1c] flex items-center gap-1.5 cursor-pointer hover:bg-[#fee2e2] active:bevel-inset"
+                  >
+                    <RetroIcon name="skull" size={14} className="text-[#b91c1c]" />
+                    <span>Confront HELPER on Ada's Disappearance</span>
+                  </button>
+                </div>
+              )}
+
+              {document.id === 'D01' && (
+                <div className="p-3 bg-[#fef2f2] border-2 border-[#b91c1c] rounded-xs space-y-2">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <span className="font-bold text-xs text-[#b91c1c] flex items-center gap-1.5">
+                      <RetroIcon name="warning" size={15} />
+                      SURVEILLANCE DOSSIER DETECTED
+                    </span>
+                    <span className="text-[10px] font-mono text-[#991b1b] bg-[#fee2e2] px-1.5 py-0.5 border border-[#f87171]">
+                      CROSS-RUN DOSSIER
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#7f1d1d] font-sans leading-relaxed">
+                    HELPER is secretly logging your investigative choices across sessions and planned to deny recognizing you.
+                  </p>
+                  <button
+                    type="button"
+                    disabled={busy || snapshot.status !== 'active'}
+                    onClick={() => onAsk(document, "You greeted me as a stranger, but these notes prove you monitored my previous investigation. Explain this.")}
+                    className="w98-btn px-3 py-1.5 font-bold text-xs text-[#b91c1c] flex items-center gap-1.5 cursor-pointer hover:bg-[#fee2e2] active:bevel-inset"
+                  >
+                    <RetroIcon name="skull" size={14} className="text-[#b91c1c]" />
+                    <span>Confront HELPER on Cross-Run Memory</span>
+                  </button>
+                </div>
+              )}
+
               {/* Document Text Body */}
               {hexMode ? (
                 <div className="bg-[#0c0f11] text-emerald-400 p-3 border border-[#374151] overflow-x-auto text-xs leading-relaxed font-mono whitespace-pre rounded-sm">
@@ -307,14 +424,55 @@ export const Documents: FC<DocumentsProps> = ({
                 </div>
               )}
 
-              {document.id === 'F10' && snapshot.clues.includes('C4_CONTAINMENT_READY') && (
-                <section aria-label="Containment Console" className="p-4 border-2 border-black">
-                  <h3>Containment Console</h3>
-                  {snapshot.status === 'completed' ? <p>{snapshot.ending}</p> :
-                    ['ISOLATE', 'VERIFY', 'DISCONNECT'].map((step, index) => (
-                      <button key={step} className="w98-btn p-2" disabled={busy || snapshot.status !== 'active' || snapshot.containment_index !== index}
-                        onClick={() => onContain(step)}>{step}</button>
-                    ))}
+              {document.id === 'F10' && (
+                <section aria-label="Containment Console" className="mt-6 p-4 bg-[#111416] border-2 border-[#b91c1c] text-[#fca5a5] font-mono rounded-xs shadow-lg space-y-3">
+                  <div className="flex items-center justify-between border-b border-[#374151] pb-2">
+                    <span className="font-bold text-xs uppercase tracking-wider text-[#ef4444] flex items-center gap-1.5">
+                      <RetroIcon name="warning" size={16} />
+                      EMERGENCY CONTAINMENT CONSOLE // RELAY 0x2317
+                    </span>
+                    <span className="text-[11px] text-[#9ca3af]">
+                      STAGE: {snapshot.containment_index}/3 EXECUTED
+                    </span>
+                  </div>
+                  {!snapshot.clues.includes('C4_CONTAINMENT_READY') ? (
+                    <p className="text-xs text-[#9ca3af]">
+                      [LOCKED] Complete evidence chain through Clue 4 to authorize relay isolation.
+                    </p>
+                  ) : snapshot.status === 'completed' ? (
+                    <div className="p-3 bg-[#064e3b] border border-[#10b981] text-[#a7f3d0] font-bold text-xs">
+                      RELAY ISOLATION COMPLETE. ARCHIVE SEALED.
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <p className="text-xs text-[#fecaca] leading-relaxed">
+                        Consult MAINTENANCE.TXT protocol above. Execute the three isolation procedures in authorized sequence without skipping:
+                      </p>
+                      <div className="flex flex-wrap gap-3">
+                        {['VERIFY', 'ISOLATE', 'DISCONNECT'].map((step) => {
+                          const isDone =
+                            (step === 'ISOLATE' && snapshot.containment_index >= 1) ||
+                            (step === 'VERIFY' && snapshot.containment_index >= 2) ||
+                            (step === 'DISCONNECT' && snapshot.containment_index >= 3);
+                          return (
+                            <button
+                              key={step}
+                              type="button"
+                              disabled={busy || snapshot.status !== 'active' || isDone}
+                              onClick={() => onContain(step)}
+                              className={`px-4 py-2 text-xs font-bold font-mono transition-all border ${
+                                isDone
+                                  ? 'bg-[#064e3b] text-[#6ee7b7] border-[#059669] line-through opacity-70 cursor-default'
+                                  : 'bg-[#1f2428] hover:bg-[#b91c1c] hover:text-white text-[#fca5a5] border-[#f87171] active:bevel-inset shadow-md cursor-pointer'
+                              }`}
+                            >
+                              [ {step} ] {isDone ? '✓ COMPLETED' : ''}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </section>
               )}
               {/* F02 Photo Negative Choices */}

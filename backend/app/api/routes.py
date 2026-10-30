@@ -40,7 +40,7 @@ def game_routes(director: Director) -> APIRouter:
 
     @router.post('/runs/{run_id}/chat', response_model=ChatResponse)
     async def chat(run_id: UUID, action: ChatAction):
-        return await director.chat(run_id, action.message)
+        return await director.chat(run_id, action.message, action.evidence_id)
 
     @router.post('/runs/{run_id}/containment', response_model=ContainmentResponse)
     def containment(run_id: UUID, action: ContainmentAction):
